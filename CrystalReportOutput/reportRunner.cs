@@ -33,20 +33,27 @@ namespace CrystalReportOutput
         /// <param name="reportPath">The full path to the report</param>
         /// <param name="outputStream">The Memory Stream containing the output</param>
         /// <param name="databasePassword">The password to use when connecting to the database</param>
+        /// <param name="outputFileName">The name of the file to download</param>
         /// <param name="Parameters"(Optional) >Ordered list of parameter values for the report</param>
         /// <param name="_outputType">(Optional) Type of output. Defaults to PDF</param>
         /// <returns>True if report ran and created output successfully</returns>
-        public static Boolean execute(String reportPath, ref System.IO.MemoryStream outputStream, String databasePassword, List<Object> Parameters = null, outputType _outputType = outputType.pdf)
+        public static Boolean execute(String reportPath, System.Web.HttpResponse resp, String databasePassword, String outputFileName, List<Object> Parameters = null, outputType _outputType = outputType.pdf)
         {
-            var rd = execReport(reportPath, Parameters, _outputType);
             defaultPassword = databasePassword;
+            var rd = execReport(reportPath, Parameters, _outputType);
+            String t = "";
             try
             {    
                 if (rd == null) { return false; }
-                outputStream = (System.IO.MemoryStream)rd.ExportToStream(getEType(_outputType));
-                rd.Close();
-                rd.Dispose();
-                ErrorMessage = "";
+                var paramName = new List<string>();
+                for (int i = 0; i < rd.ParameterFields.Count; i++)
+                {
+                    var thisParam = rd.ParameterFields[i];
+                    var val = thisParam.CurrentValues;
+                    var pn = thisParam.Name;
+                    paramName.Add(thisParam.Name);
+                }
+                rd.ExportToHttpResponse(getEType(_outputType), resp, true, outputFileName);
                 return true;
             }
             catch (Exception ex)
@@ -67,11 +74,19 @@ namespace CrystalReportOutput
         /// <returns>True if report ran and created output successfully</returns>
         public static Boolean executeSave(String reportPath, String outputPath, String databasePassword, List<Object> Parameters = null, outputType _outputType = outputType.pdf)
         {
-            var rd = execReport(reportPath, Parameters, _outputType);
             defaultPassword = databasePassword;
+            var rd = execReport(reportPath, Parameters, _outputType);
             try
             {
                 if (rd == null) { return false; }
+                var paramName = new List<string>();
+                for (int i = 0; i < rd.ParameterFields.Count; i++)
+                {
+                    var thisParam = rd.ParameterFields[i];
+                    var val = thisParam.CurrentValues;
+                    var pn = thisParam.Name;
+                    paramName.Add(thisParam.Name);
+                }
                 var fileOptions = new DiskFileDestinationOptions();
                 var ExportPDF = rd.ExportOptions;
                 fileOptions.DiskFileName = outputPath;
@@ -125,7 +140,8 @@ namespace CrystalReportOutput
                 {
                     for (int i = 0; i < Parameters.Count; i++)
                     {
-                        rd.SetParameterValue(i, Parameters[i]);
+                        
+                        rd.SetParameterValue(i, (Parameters[i].ToString().ToUpper() == "NULL" ? null : Parameters[i]));
                     }
                 }
                 applyCredentials(ref rd);
